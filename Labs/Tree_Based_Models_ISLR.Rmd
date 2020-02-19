@@ -1,0 +1,245 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+###Decision Trees
+
+```{r}
+#install.packages("tree")
+require(ISLR)
+require(tree)
+```
+
+Carseats data is being used, using "tree" package
+
+```{r}
+data(Carseats)
+dim(Carseats)
+hist(Carseats$Sales)
+```
+
+Sales is a quantitative variable. We turn this into a binary variable so that we can make it a classification problem. Cutoff is 8 sales for high and low.
+
+```{r}
+Carseats$High <- as.factor(ifelse(Carseats$Sales <= 8, "No", "Yes"))
+```
+
+Fitting a tree based models, (removing sales from the equation because the binary response was created from it)
+
+```{r}
+tree_carseats <- tree(High~.-Sales, data = Carseats)
+summary(tree_carseats)
+
+```
+
+The summary shows the variables used in the split (not ordered), the number of terminal nodes, deviance and misclassification error rate
+
+Plotting the tree (we need to annotate the tree with the text, else it is just going to show the tree structure with no other information)
+```{r}
+plot(tree_carseats)
+text(tree_carseats,pretty=0)
+```
+
+There are so many splits in this tree, quite complex to look at! Since this is a classification problem, the terminal contains either a Yes or a No, which is the majority in that that region
+
+The detailed summary of the tree contains details of the terminal nodes, proportion at splits, and other details at every node in the tree. Quite tough to look at really.
+```{r}
+tree_carseats
+```
+
+---
+
+Creating a train-test split, building the tree on the training data and evaluating on the testing data
+
+Total records = 400; Training dataset = 250, testing dataset = 150 observations
+```{r}
+set.seed(1011)
+index <- sample(1:nrow(Carseats), 250)
+
+train_tree_carseats <- tree(High~.-Sales, data = Carseats, subset = index)
+summary(train_tree_carseats)
+```
+
+Plotting the above tree
+```{r}
+plot(train_tree_carseats)
+text(train_tree_carseats, pretty = 0)
+```
+
+The tree is similarly complex as the one with full data.
+
+Predicting the results on the test dataset
+```{r}
+test_tree_carseats_pred <- predict(train_tree_carseats, newdata = Carseats[-index,], type = "class")
+table(test_tree_carseats_pred)
+```
+
+Confusion matrix for test dataset
+```{r}
+table(test_tree_carseats_pred, Carseats$High[-index])
+
+with(Carseats[-index,],table(test_tree_carseats_pred,High))
+```
+
+Misclassification rate from the above table
+```{r}
+cat("Error Rate",(58+45)/150)
+```
+
+Using CV to control the depth. We use misclassification error as the pruning criteria
+
+```{r}
+cv_train_tree_carseats <- cv.tree(train_tree_carseats, FUN = prune.misclass)
+cv_train_tree_carseats
+```
+
+The object contains the size of the tree as pruning proceeds, the deviance, k = cost complexity parameter
+
+```{r}
+plot(cv_train_tree_carseats)
+```
+
+This plots the misclassification rate, across different sizes. The minimum seems to occur somewhere around 17-18, and we can prune the tree at that depth
+
+```{r}
+prune_carseats <- prune.misclass(train_tree_carseats, best = 13)
+plot(prune_carseats)
+text(prune_carseats, pretty = 0)
+```
+
+This is a little shallower than the previous trees. This is the result of the cross-validation.
+
+Evaluating this on the testing dataset
+```{r}
+cv_test_tree_carseats_pred <- predict(prune_carseats, Carseats[-index,], type = "class")
+table(cv_test_tree_carseats_pred)
+```
+
+Calculating the misclassification rate again
+```{r}
+table(cv_test_tree_carseats_pred, Carseats$High[-index])
+cat("Error Rate", (59+46)/150)
+```
+
+We get a similar performance with respect to misclassification rate, but the tree is shallower.
+
+---
+
+More complicated tree-based models using Boston Housing Data (housing values, statistics in 506 suburbs of Boston based on 1970 census)
+
+###Random Forests
+
+```{r}
+require(MASS)
+require(randomForest)
+```
+
+This builds a lot of trees, selecting a split parameter from a subset of parameters, and averages out to reduce the variance.
+
+Creating a train-test split with 300-206 data observations each
+```{r}
+set.seed(101)
+data(Boston)
+index <- sample(1:nrow(Boston), 300)
+```
+
+We use random forest for regression, with 'medv' as the response variable and every other variable as the predictor.
+
+
+```{r}
+rf_boston <- randomForest(medv~., data = Boston, subset = index)
+rf_boston
+```
+
+500 trees were grown. The number of variables at each split is 4, which is approximately sqrt(13), the number of parameters. The MSR is Out of Bag mean squared residuals.
+
+m is the number of variables that is selected at each split in random. This is given by the mtry parameter in randomForest(). And this is one of the parameters that we can tune.
+
+Building random forest decision trees with m ranging from 1 to 13 (p parameters), and recording the OOB and test errors
+
+```{r}
+oob_rf_error <- double(13)
+test_rf_error <- double(13)
+
+for(m in 1:13)
+{
+  fit <- randomForest(medv~., data = Boston, subset = index, mtry = m, ntree = 400)
+  oob_rf_error[m] <- fit$mse[400]
+  pred <- predict(fit, Boston[-index,])
+  test_rf_error[m] <- with(Boston[-index,], mean((medv - pred)^2))
+  cat(m," ")
+}
+
+```
+
+
+Plotting the oob and test errors across m
+
+- type = "b" means it plots both the points and connects them with lines
+```{r}
+matplot(1:m, cbind(test_rf_error, oob_rf_error), pch = 19, col = c("red", "blue"), type = "b", ylab = "Mean Squared Error")
+legend("topright", legend = c("OOB", "Test"), pch = 19, col = c("red", "blue"))
+```
+
+If we want to do Bagging, we can use mtry = number of parameters. The left most is value is the MSE of a single tree
+
+---
+
+###Boosting
+
+We run a simple boositng logic on the same Boston data. We use the package "gbm" (Gradient Boosted Machines)
+
+```{r}
+require(gbm)
+```
+
+We ask for 10000 because there are a lot of shallow trees, with 4 depths. So, 4 splits choosing 4 variables.
+
+```{r}
+boost_boston <- gbm(medv~., data = Boston[index,], distribution = "gaussian", n.trees = 10000, shrinkage = 0.01, interaction.depth =4)
+summary(boost_boston)
+```
+
+Summary gives the variable importance plot! The two variables that seem to be important are lstat and rm
+
+Checking out the two variables, partial dependence plots
+```{r}
+par(mfrow = c(1,2))
+plot(boost_boston, i = "lstat")
+plot(boost_boston, i = "rm")
+```
+
+Higher the proportion of lower status people in the suburb, lower the value of the house
+Higher the number of rooms in the house, higher the value of the house
+
+---
+
+Looking at the test performance as a function of the number of trees
+
+```{r}
+no_trees <- seq(from = 100, to = 10000, by = 100)
+pred_matrix <- predict(boost_boston, newdata = Boston[-index,], n.trees = no_trees)
+
+```
+
+pred_matrix consists of a matrix of predictions of the test data. So, there are 206 observations of the test data, and 100 different tree predictions
+
+Computing the test error
+
+We have calculated the squared differences for each of the columns, and then we take the mean of each column. This computes the column-wise mean squared error
+```{r}
+boost_test_error <- with(Boston[-index,], apply((pred_matrix - medv)^2, 2, mean))
+```
+
+
+Ploting the boosting test error and comparing it with the random forest error
+
+```{r}
+plot(no_trees, boost_test_error, pch = 19, ylab = "Mean Squared Error", xlab = "# of Trees", main = "Boosting Test Error")
+abline(h = min(test_rf_error), col = "red")
+```
+
+The test error drops down, but levels off. There is no real increase of decrease.
+
+---

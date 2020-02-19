@@ -1,0 +1,297 @@
+---
+title: "Non Linear Models"
+output: html_notebook
+---
+
+Loading the ISLR package. We would be using the dataset Wage
+
+```{r}
+require(ISLR)
+
+data(Wage)
+```
+
+---
+
+###Polynomial regression
+
+With one response age, and we fit a 4 degree polynomial.
+
+```{r}
+
+poly_fit <- lm(wage~poly(age, 4), data = Wage)
+summary(poly_fit)
+```
+
+This looks to be significant up to 3 degrees at 0.05 level.
+
+Plotting response
+
+```{r}
+#Getting the range of age and create a sequence of ages in between to use as new_data for prediction
+age_range <- range(Wage$age)
+age_grid <- seq(from = age_range[1], to = age_range[2])
+
+poly_fit_preds <- predict(poly_fit, newdata = list(age = age_grid), se = T)
+poly_fit_se_bands <- cbind(poly_fit_preds$fit + 1.96 * poly_fit_preds$se, poly_fit_preds$fit - 1.96 * poly_fit_preds$se)
+
+plot(Wage$age, Wage$wage, col = "darkgrey")
+lines(age_grid, poly_fit_preds$fit, lwd = 2, col = "blue")
+matlines(age_grid, poly_fit_se_bands, col = "blue", lty = 2)
+
+```
+
+---
+
+Another way to achieve this in R, because there are so many packages and methods - 
+
+```{r}
+fit_age_2=lm(wage~age+I(age^2)+I(age^3)+I(age^4),data=Wage)
+summary(fit_age_2)
+```
+
+- I() is an Identity function, because "^" (caret) sign has a different meaning in R. So, age^2 is not really age squared, but I(age^2) is.
+
+- In the above summary, the coefficients and the p-value are not the same as the previous code block's result. Because the basis is different.
+
+But the fitted value remains the same. We should get a straight line when we compare this with our previous fit.
+
+```{r}
+plot(fitted(poly_fit), fitted(fit_age_2))
+```
+
+
+So, we see that only the first three degrees are significant and useful. But we tested that separately using a simple fit. This only works with a single variable. If we really need to compare two models (Is 1 degree model better than a 2 degree model), we need to use an anova. This can be used when there are multiple variables in the model!
+
+---
+
+In case of nested linear models, where one model is an addition to an existing model, we use anova like - 
+
+```{r}
+fit_edu <- lm(wage ~ education, data = Wage)
+fit_edu_age <- lm(wage ~ education + age, data = Wage)
+poly_fit_edu_age <- lm(wage ~ education + poly(age, 2), data = Wage)
+poly_fit_edu_age3 <- lm(wage ~ education + poly(age, 3), data = Wage)
+```
+
+Anova test
+
+H0 - The additional variable has no impact on the model (current model and reduced model are the same)
+Ha - The additional variable does impact the model
+
+```{r}
+anova(fit_edu, fit_edu_age, poly_fit_edu_age, poly_fit_edu_age3)
+```
+
+It is clear that the first two linear models are significant. A polynomial on age, with degree 2 is also significant. But the fourth, with age^3, is only just marginally significant at the 0.05 level. We may want to choose and remove this degree. 
+
+---
+
+###Polynomial Logistic Regression
+
+We can also proceed to use the same function for a logistic regression. Here we create a binary response of wage based on the plot we see. Big earners with wage > 250k tagged as 1, and remaining 0
+
+```{r}
+plot(Wage$age, Wage$wage)
+```
+
+```{r}
+poly_logit_fit=glm(I(wage>250) ~ poly(age,3), data=Wage, family=binomial)
+summary(poly_logit_fit)
+```
+
+
+Getting standard error bands
+```{r}
+poly_logit_preds <- predict(poly_logit_fit,list(age=age_grid),se=T)
+poly_logit_se_bands <- poly_logit_preds$fit + cbind(fit=0,lower=-1.96*poly_logit_preds$se,upper=1.96*poly_logit_preds$se)
+poly_logit_se_bands[1:5,]
+```
+
+This predict is on the logit scale. We need to transform or perform the inverse logit in order to get the reverse mapping and get the probability values.
+
+Inverse Logit function is
+
+$$p=\frac{e^\eta}{1+e^\eta}.$$
+
+```{r}
+prob_poly_logit_preds <- exp(poly_logit_se_bands)/(1+exp(poly_logit_se_bands))
+
+matplot(age_grid, prob_poly_logit_preds, col = "blue", lwd = c(2,1,1), lty = c(1,2,2), type = "l", ylim = c(0,.1))
+```
+
+The blue line is the estimate of the fitted probability, and the dotted lines are the corresponding 95% confidence interval. We basically calculate everything on the logit scale and transform them back into the probability scale.
+
+Adding the same points to the plot. The jitter function takes a point, adds some random uniform noise to it so that the points get kind of blown up to give the picture about its density. Think of it as a boxplot, but with noise now instead of all points concentrated at a single location. 
+
+```{r}
+matplot(age_grid, prob_poly_logit_preds, col = "blue", lwd = c(2,1,1), lty = c(1,2,2), type = "l", ylim = c(0,.1))
+points(jitter(Wage$age), I(Wage$wage > 250)/10, pch = "|", cex = .5)
+```
+
+Only a max 4% of the population across all ages earned above 250k. In the above plot, we have divided the Wage scale by 10 in order to bring the points into the picture. Otherwise, it will be way up above the plot, and we wont be able to see it.
+
+
+---
+
+###Splines
+
+
+Fitting splines (cubic) on the same dataset. Splines are more flexible than polynomials.
+
+
+```{r}
+require(splines)
+
+#This fits a cubic spline at knots of age 25, 40 and 60
+spline_fit <- lm(wage ~ bs(age, knots = c(25, 40, 60)), data = Wage)
+```
+
+```{r}
+plot(Wage$age, Wage$wage, col = "darkgrey")
+lines(age_grid, predict(spline_fit, list(age = age_grid)), col = "darkgreen", lwd = 2)
+abline(v = c(25,40,60), lty = 2, col = "darkgreen")
+```
+
+Spline - cubic polynomial. The bs() gives basis for cubic polynomial.
+Knots - Where we think discontinuity will happen (@ third derivative). Basically, we have a polynomial to the degree 3 at each of the region, constrained to "meet" or be continous at the knot. So this means they are more local than polynomials.
+
+Comparing the polynomial fit with that of the GAM model
+
+For the Wages dataset, it seems similar. But for a dataset with more sparse tail observations, the polynomial fit would be a little unpredictable, while the splines will be a little more flexible and not so "wagging"
+
+```{r}
+par(mfrow = c(1,2))
+
+plot(Wage$age, Wage$wage, col = "darkgrey")
+lines(age_grid, poly_fit_preds$fit, lwd = 2, col = "blue")
+matlines(age_grid, poly_fit_se_bands, col = "blue", lty = 2)
+
+plot(Wage$age, Wage$wage, col = "darkgrey")
+lines(age_grid, predict(spline_fit, list(age = age_grid)), col = "darkgreen", lwd = 2)
+abline(v = c(25,40,60), lty = 2, col = "darkgreen")
+
+```
+
+---
+
+In the previous fit, we fixed the knots. We can also have smoothing splines!
+
+Smoothing splines considers every point to be a knot, and they have a roughness penalty to control the smoothness of the function. Basically, we do not have to manually select the knots. We specify the penalty through the effective degree of freedom.
+
+```{r}
+smooth_spline_fit=smooth.spline(Wage$age, Wage$wage,df=16)
+```
+
+Adding the above fit to the fixed splines
+```{r}
+par(mfrow = c(1,2))
+plot(Wage$age, Wage$wage, col = "darkgrey")
+lines(smooth_spline_fit, col = "red", lwd = 2)
+
+plot(Wage$age, Wage$wage, col = "darkgrey")
+lines(age_grid, predict(spline_fit, list(age = age_grid)), col = "darkgreen", lwd = 2)
+abline(v = c(25,40,60), lty = 2, col = "darkgreen")
+lines(smooth_spline_fit, col = "red", lwd = 2)
+```
+
+16 degrees of freedom is a lot, which results in the fit in being too "Wiggly"
+
+Another effective way to determine the degree (instead of forcing it to take a particular value manually), is through cross-validation. This selects the smoothing parameter for us automatically.
+
+```{r}
+smooth_spline_cv_fit=smooth.spline(Wage$age, Wage$wage,cv=TRUE)
+```
+
+Adding the smooth spline with df chosen through cv to the above plot
+```{r}
+
+par(mfrow = c(1,2))
+plot(Wage$age, Wage$wage, col = "darkgrey")
+lines(smooth_spline_cv_fit, col = "purple", lwd = 2)
+
+
+plot(Wage$age, Wage$wage, col = "darkgrey")
+lines(age_grid, predict(spline_fit, list(age = age_grid)), col = "darkgreen", lwd = 2)
+abline(v = c(25,40,60), lty = 2, col = "darkgreen")
+lines(smooth_spline_fit,col="red",lwd=2)
+lines(smooth_spline_cv_fit,col="purple",lwd=2)
+```
+
+The warning is because there are many ties in x
+
+```{r}
+smooth_spline_cv_fit
+```
+
+The effective degrees of freedom in the cv smoothing spline is 6.79 (heuristic for how rough the function is). For the fixed knot model, the degree of freedom was 6.
+
+---
+
+###Generalized Additive Models
+
+GAM package helps in fitting multiple non-linear functions (one for each variable) and makes it additive. It also provides good plotting functions.
+
+We create a model with - a smooth term with age (4 degrees of freedom), a smooth term with year(4 degrees of freedom) and a linear term education (which is a factor variable, so it makes dummy variables)
+
+```{r}
+#install.packages("gam")
+```
+
+```{r}
+require(gam)
+gam_fit=gam(wage~s(age,df=4)+s(year,df=4)+education,data=Wage)
+```
+
+When we plot the GAM, we will be able to see a fitted plot for each of the variable
+
+```{r}
+par(mfrow=c(1,3))
+plot(gam_fit,se=T)
+```
+
+There are three plots - one for each term in the GAM. We see that salaries tend to increase with year other than the dip. Salary also increases with education.
+
+---
+
+We can also fit GAMs with logistic regression model
+
+```{r}
+gam_fit2=gam(I(wage>250)~s(age,df=4)+s(year,df=4)+education,data=Wage,family=binomial)
+
+par(mfrow = c(2,3))
+plot(gam_fit2)
+plot(gam_fit2, se = T)
+```
+
+This is plotting the contribution to the logit of the probability. The standard errors are actually very wide.
+
+---
+
+Using GAM, we can do some tests. Lets see if we need a nonlinear terms for year. So we fit the same model as before, except instead of having a smooth term with year, we have a linear term with year.
+
+ANOVA with test = "Chisq" (because logistic regression)
+```{r}
+gam_fit2_linearYear=gam(I(wage>250)~s(age,df=4)+year+education,data=Wage,family=binomial)
+anova(gam_fit2_linearYear,gam_fit2,test="Chisq")
+```
+
+We see that from the test resuts, the non_linear function for year is not needed. Linear term is good enough!
+
+---
+
+Plotting is powerful using the GAM package, which is not restricted to plotting GAM objects, but can be used even with LM or GLM objects
+
+```{r fig.width=10, fig.height=5}
+sample_lm_fit=lm(wage~ns(age,df=4)+ns(year,df=4)+education,data=Wage)
+
+par(mfrow=c(1,3))
+plot.Gam(sample_lm_fit,se=T)
+```
+
+ns() gives a basis of natural splines
+
+
+
+
+ 

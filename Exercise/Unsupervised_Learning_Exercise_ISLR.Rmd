@@ -1,0 +1,66 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+1) Suppose we want to fit a linear regression, but the number of variables is much larger than the number of observations. In some cases, we may improve the fit by reducing the dimension of the features before.
+
+In this problem, we use a data set with n = 300 and p = 200, so we have more observations than variables, but not by much. Load the data x, y, x.test, and y.test from 10.R.RData.
+
+First, concatenate x and x.test using the rbind functions and perform a principal components analysis on the concatenated data frame (use the "scale=TRUE" option). To within 10% relative error, what proportion of the variance is explained by the first five principal components?
+
+```{r}
+setwd("E:/Academia/Additional/Statistical Learning - Lagunita Stanford/R Codes")
+load("10.R.Rdata")
+```
+
+Combining the dataset and running the PCA, we get
+```{r}
+x_whole <- rbind(x, x.test)
+
+#prcomp will standardize the variables for us
+pca_out=prcomp(x_whole, scale=TRUE)
+
+pca_out
+```
+
+```{r}
+names(pca_out)
+```
+
+```{r}
+pca_out$sdev[1:5]
+pca_out$sdev[1:5]^2
+sum(pca_out$sdev[1:5]^2)/200
+```
+
+The previous answer suggests that a relatively small number of "latent variables" account for a substantial fraction of the features' variability. We might believe that these latent variables are more important than linear combinations of the features that have low variance.
+
+We can try forgetting about the raw features and using the first five principal components (computed on rbind(x,x.test)) instead as low-dimensional derived features. What is the mean-squared test error if we regress y on the first five principal components, and use the resulting model to predict y.test?
+
+
+```{r}
+
+pca_df <- data.frame(pca_out$x[,1:5])
+
+pca_df <- cbind(pca_df, rbind(data.frame(y), data.frame(y = y.test)))
+
+train_model <- lm(y ~ PC1 + PC2 + PC3 + PC4 + PC5, data = pca_df[1:300,])
+
+mean((predict(train_model, newdata = pca_df[301:1300,]) - y.test)^2)
+
+```
+
+
+Now, try an OLS linear regression of y on the matrix x. What is the mean squared predition error if we use the fitted model to predict y.test from x.test?
+
+```{r}
+data <- cbind(x,y)
+
+train_old <- lm(y ~., data = data)
+
+test_data <- cbind(x.test, y = y.test)
+
+mean((predict(train_old, newdata = test_data) - test_data$y)^2)
+```
+

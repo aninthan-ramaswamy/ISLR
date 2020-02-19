@@ -1,0 +1,54 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Exercise 
+
+Data
+```{r}
+setwd("E:/Academia/Additional/Statistical Learning - Lagunita Stanford/R Codes")
+list.files()
+rm(list = ls())
+load("5.R.RData")
+```
+
+Q1
+```{r}
+simpleFit <- lm(y ~ X1 + X2,data = Xy)
+
+summary(simpleFit)
+```
+
+Q2
+```{r}
+matplot(Xy,type="l")
+```
+
+Q3
+```{r}
+beta_hat_1 <- function(data, index, formula) {
+    
+    model <- lm(formula, data = data[index, ])
+    
+    summary(model)$coefficients[2, 1]
+}
+
+library(boot)
+boot_model_51 <- boot(data = Xy, statistic = beta_hat_1, R = 15000, formula = y ~ 
+    X1 + X2, parallel = "snow", ncpus = 4)
+
+boot.ci(boot_model_51, conf = 0.9)
+boot_model_51
+```
+
+Q4
+
+```{r}
+block_boot_model_51 <- tsboot(Xy, beta_hat_1, formula = y ~ X1 + X2, R = 15000, 
+    sim = "fixed", l = 100, parallel = "snow", ncpus = 4)
+
+boot.ci(block_boot_model_51, conf = 0.9)
+block_boot_model_51
+```
+

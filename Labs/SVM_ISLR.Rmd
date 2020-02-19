@@ -1,0 +1,197 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+###Linear SVM Classifier
+
+We will use the e1071 package, that contains the svm function to run our codes
+
+```{r}
+#install.packages("e1071")
+require(e1071)
+```
+
+
+Creating a low dimensionion dataset, and run SVM classifier on it.
+Variable x - 20 observations across two classes (normally distributed)
+Variable y - 20 variables, 10 with -1 and 10 with +1
+```{r}
+set.seed(10111)
+x <- matrix(rnorm(40), 20, 2)
+y <- rep(c(-1,1), c(10,10))
+
+#For the indices where y = 1, we move the means from 0 to 1 for the x
+#This is so that we can get the dataset a little separated
+x[y==1,] <- x[y==1,] + 1
+
+plot(x, col = y + 3, pch = 19)
+```
+
+
+Creating a dataframe of the created dataset and running a linear SVM
+
+```{r}
+
+#Turning y into a factor variable
+dat <- data.frame(x, y = as.factor(y))
+
+#Calling SVM function, y as response. Linear kernal. Cost parameter is 10
+#We are not standardizing the variables
+svm_fit <- svm(y~., data = dat, kernel = "linear", cost = 10, scale = FALSE)
+
+print(svm_fit)
+```
+
+The above linear SVM fit has 6 support vectors (points on the boundary + on the wrong side of the boundary)
+
+Plotting the svm fit. This is a simple plot, that shows the points, the regions and the SV points. But it flips the axis and is a little crude
+
+```{r}
+plot(svm_fit, dat)
+```
+
+---
+
+Creating our own plot to display SVM results
+
+1) Create our own grid of values from X1 and X2 (columns of the data we created)
+2) Predict the class for each point
+3) Plot them color coded by the class to see the decision boundary
+
+```{r}
+#Function creating a grid, with number of points in each direction
+make_grid <- function(x, n = 75){
+  grange <- apply(x, 2, range)
+  x1 <- seq(from = grange[1,1], to = grange[2,1], length = n)
+  x2 <- seq(from = grange[1,2], to = grange[2,2], length = n)
+  expand.grid(X1 = x1, X2 = x2)
+}
+
+xgrid <- make_grid(x)
+ygrid <- predict(svm_fit, xgrid)
+
+```
+
+
+Plotting our prediction and datapoints
+
+1) Plot all the points on xgrid, then colour by the class so that we can clearly see the decision boundry
+2) Plot the original points on the decision boundry
+3) SVM fit object has an Index component that has the index of the support vectors, which we plot and highlight
+
+```{r}
+plot(xgrid, col = c("red", "blue")[as.numeric(ygrid)], pch = 20, cex = .2)
+points(x,col=y+3,pch=19)
+points(x[svm_fit$index,],pch=5,cex=2)
+
+```
+
+---
+
+The linear coefficients is not directly available in the SVM fit object, but can be derived from the components of the object. This coefficient makes sense for a linear kernel.
+
+We extract the linear coefficients, and then using simple algebra, we include the decision boundary and the two margins.
+
+1) The SVM fit function has the "coefs" for the support vectors. (It is 0 for the other points as only the support vectors are instrumental in forming the hyperplane)
+
+The formula is present in ESL
+```{r}
+beta <- drop(t(svm_fit$coefs) %*% x[svm_fit$index,])
+beta0 <- svm_fit$rho
+```
+
+
+Replotting the points and using the coefficients to draw the decision boundaries
+
+The equation is of the form -
+beta0 + beta1*x1 + beta2*x2 = 0
+
+Figure out the slope and the intercept of the decision boundary above. abline uses the intercept and the slope
+
+```{r}
+plot(xgrid,col=c("red","blue")[as.numeric(ygrid)],pch=20,cex=.2)
+points(x,col=y+3,pch=19)
+points(x[svm_fit$index,],pch=5,cex=2)
+abline(beta0/beta[2],-beta[1]/beta[2])
+abline((beta0-1)/beta[2],-beta[1]/beta[2],lty=2)
+abline((beta0+1)/beta[2],-beta[1]/beta[2],lty=2)
+
+```
+
+
+We can use cross-validation to select the right cost
+
+---
+
+###Non linear SVM Classifier
+
+Taking example from ESL (mixture data, which is simulated), where the decision boundry was non-linear
+
+```{r}
+load(url("http://www.stanford.edu/~hastie/ElemStatLearn/datasets/ESL.mixture.rda"))
+names(ESL.mixture)
+attach(ESL.mixture)
+```
+
+Plotting the data and viewing the classes
+
+```{r}
+plot(x, col = y + 1)
+```
+
+There is a good amount of overlap in the data.
+
+Creating a dataframe of the data and fitting a SVM with radial kernerl to it
+
+```{r}
+dat <- data.frame(y = factor(y), x)
+radial_svm_fit <- svm(factor(y)~., data = dat, scale = FALSE, kernel = "radial", cost = 5)
+print(radial_svm_fit)
+```
+
+Creating a grid such as before and making predictions on the grid.
+The ESL.mixture dataset comes with the grid as a component, and so we can use that directly. Else we will have to use the function created earlier.
+```{r}
+xgrid <- expand.grid(X1=px1,X2=px2)
+ygrid <- predict(radial_svm_fit, xgrid)
+```
+
+Plotting the grid and the predictions
+
+```{r}
+plot(xgrid, col = as.numeric(ygrid), pch = 20, cex = .2)
+points(x, col = y+1, pch = 19)
+```
+
+The decision boundary is not linear.
+
+Creating the actual decision boundary and plotting it using the contour function.
+
+The ESL.mixture has a prob component, that gives the true probability of a +1 vs -1 at every value of the grid.
+
+So, we will plot the contour at 0.5, which is the true decision boundary of the data. And the predict the decision boundary from our model (the function value itself and not the class output)
+
+```{r}
+#Predicting fit on the grid. Decision values = T because we need the value of the function and not just the classification
+func <- predict(radial_svm_fit, xgrid, decision.values = TRUE)
+
+#This returns an attribute and we need to pull of that
+func <- attributes(func)$decision
+
+```
+
+
+Plotting the above decision values
+
+```{r}
+plot(xgrid,col=as.numeric(ygrid),pch=20,cex=.2)
+points(x,col=y+1,pch=19)
+
+
+contour(px1,px2,matrix(func,69,99),level=0,add=TRUE)
+#Adding the truth, using the 0.5 contour
+contour(px1,px2,matrix(prob,69,99),level=.5,add=TRUE,col="blue",lwd=2)
+```
+
+---

@@ -1,0 +1,32 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+setwd("E:/Academia/Additional/Statistical Learning - Lagunita Stanford/R Codes")
+load("7.R.rdata")
+```
+
+Load the data from the file 7.R.RData, and plot it using plot(x,y). What is the slope coefficient in a linear regression of y on x (to within 10%)?
+```{r}
+plot(x,y)
+```
+
+```{r}
+summary(lm(y~x))
+```
+
+
+```{r}
+lm(y ~ 1+x+I(x^2))
+```
+
+Despite the fact that the overall slope is slightly negative, the linear term is very positive.
+
+Because the values of x are far from zero, a large linear term is needed to offset the quadratic term; otherwise the slope would be very negative in the range of the data. This is why we usually do not interpret the lower-order terms in a polynomial regression.

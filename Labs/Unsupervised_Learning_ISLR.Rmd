@@ -1,0 +1,133 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+###Principal Components
+
+Using the USA Arrests dataset for unsupervised learning
+
+```{r}
+dimnames(USArrests)
+apply(USArrests,2,mean)
+apply(USArrests,2, var)
+```
+
+Principal Components is about the Variance (Mean will be made 0). We see that Assault has the most variance. If a single variable has a lot of variance, it might dominate the principal components
+
+We calculate the PCA by standardizing the variables
+
+```{r}
+#prcomp will standardize the variables for us
+pca.out=prcomp(USArrests, scale=TRUE)
+pca.out
+```
+
+The standard deviations are the SD of the four principal components. The rotation are the loadings
+- The 1 PC is loaded equally on Murder, Assault, Rape (all the three crimes) and loaded less on the Urban population. The sign doesnt matter really, because the variance doesnt change
+- The second is heavily loaded on the urban population
+
+Plotting the first two components
+
+```{r}
+biplot(pca.out, scale = 0, cex = 0.6)
+```
+
+
+The red is the direction of the loadings of the principal components while each state takes a position on the x plot.
+
+Eg. Florida, Nevada, California is high on crime. Maine, North Dakota, New Hampshire have low crime
+The y axis is about whether the state has a high population or not
+
+
+### K - Means Clustering
+
+We work on a simulated data, where we have clusters and we shift them by shifting their means
+
+```{r}
+set.seed(101)
+#Generating 2 columns, 100 records
+x <- matrix(rnorm(100*2), 100, 2)
+#Generating means and shiting means for the 4 clusters
+xmean <- matrix(rnorm(8, sd = 4), 4, 2)
+#Which point is going to be placed on which cluster?
+which <- sample(1:4, 100, replace = TRUE)
+#xmean[which,] produces a 100 row matrix with 2 columns
+x <- x + xmean[which,]
+
+plot(x, col = which, pch = 19)
+```
+
+Running a kmeans on this dataset
+
+```{r}
+#We run 15 random starts (15 times algorithm, each time the starting cluster assignment is different)
+kmout <- kmeans(x, 4, nstart = 15)
+kmout
+```
+
+- Cluster Means - Centroid
+- Cluster Vector - Assignment of cluster to the data point
+- Within cluster sum of squares is summary of the cluster
+- between sum of squares/total sum of squares is like R^2 for clustering. It is the percentage of variance explained by the clustering
+
+Plotting the data 
+
+```{r}
+#Clusters
+plot(x, col = kmout$cluster, cex = 2, pch = 1, lwd = 2)
+#Plotting the original data
+points(x, col = which, pch = 19)
+```
+
+There are one or two mismatches between the blue and black. They are much closer to each other and this result is reasonable.
+
+
+###Hierarchical Clustering
+
+We use the same simulated dataset for hierarchical clustering
+
+Computing the clusters based on different link functions and plotting the dendogram (bottom-up clustering)
+```{r}
+hc_complete <- hclust(dist(x), method = "complete")
+hc_single <- hclust(dist(x), method = "single")
+hc_average <- hclust(dist(x), method = "average")
+
+par(mfrow = c(1,3))
+plot(hc_complete)
+plot(hc_single)
+plot(hc_average)
+```
+
+
+- We know there are 4 clusters. The "complete" cluster gives us 4 big clusters at height ~ 6, and this should match with the original clusters. 
+- "single" cluster is different, this would mostly join individual data points with clusters. Gives lon, strung out clusters
+- "average" gives us something in between
+
+Complete is the prefered method
+
+"cuttree" is a function used to get the clusters at a preferred height level. We compare this with the original data
+
+```{r}
+hc_cut <- cutree(hc_complete, 4)
+
+table(hc_cut, which)
+```
+The orders are actually arbitrary. THe small numers are the misidentifications. 1 in hc_cut is not the same as 1 in original data
+
+
+Comparing with K-Means clustering (4 clusters)
+```{r}
+table(hc_cut, kmout$cluster)
+```
+
+We see similar results for the kmeans and hierarchical clustering
+
+The dendograms can be labelled with the original cluster assignments in order to see misassignments
+```{r}
+plot(hc_complete,labels=which)
+```
+ 
+
+
+

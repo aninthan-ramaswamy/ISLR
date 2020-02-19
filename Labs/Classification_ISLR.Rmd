@@ -1,0 +1,132 @@
+---
+title: "ISLR - Learning Classification using the Stock Market Data"
+output: html_notebook
+---
+
+1) Running Logistic Regression models on the Stock Market dataset
+
+```{r}
+library(ISLR)
+names(Smarket)
+summary(Smarket)
+```
+
+```{r}
+pairs(Smarket, col = Smarket$Direction)
+```
+
+- Running a logistic regression model
+
+```{r}
+glm_fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, data = Smarket, family = binomial)
+summary(glm_fit)
+glm_probs <- predict(glm_fit, type = "response")
+glm_probs[1:5]
+glm_pred <- ifelse(glm_probs>0.5,"Up","Down")
+```
+
+
+Checking our performance
+
+```{r}
+#Getting the classification confusion matrix
+table(glm_pred, Smarket$Direction)
+
+#Getting our classification performance
+#Correct classifications/Total number of observations
+mean(glm_pred==Smarket$Direction)
+```
+
+- Splitting into train-test
+```{r}
+train <- Smarket$Year < 2005
+glm_fit_train <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, data = Smarket, family = binomial, subset = train)
+glm_probs_test <- predict(glm_fit_train, newdata = Smarket[!train,], type = "response")
+glm_pred_test <- ifelse(glm_probs_test>0.5, "Up", "Down")
+```
+
+Checking performance on test data
+```{r}
+Smarket_Direction_2005 <- Smarket$Direction[!train]
+table(glm_pred_test, Smarket_Direction_2005)
+
+#Correct classification accuracy for test
+mean(glm_pred_test == Smarket_Direction_2005)
+```
+
+- Classification using only lag1 and lag2 terms
+```{r}
+glm_fit_train2 <- glm(Direction ~ Lag1 + Lag2, data = Smarket, family = binomial, subset = train)
+glm_probs_test2 <- predict(glm_fit_train2, newdata = Smarket[!train,], type = "response")
+glm_pred_test2 <- ifelse(glm_probs_test2>0.5, "Up", "Down")
+```
+
+Checking performance of updated classification codes
+```{r}
+table(glm_pred_test2, Smarket_Direction_2005)
+mean(glm_pred_test2 == Smarket_Direction_2005)
+
+```
+
+
+
+----------------------------------------------------------------------
+
+2) Running Linear Discriminant Analysis on the Stock Market dataset
+
+```{r}
+library(MASS)
+rm(list = ls())
+```
+
+
+Fitting a LDA model
+```{r}
+lda_fit <- lda(Direction ~ Lag1 + Lag2, data = Smarket, subset = Year < 2005)
+lda_fit
+plot(lda_fit)
+```
+
+
+Checking what the performance is on test data (year = 2005)
+
+```{r}
+Smarket_2005 <- subset(Smarket, Year == 2005)
+lda_pred = predict(lda_fit, Smarket_2005)
+data.frame(lda_pred)[1:5,]
+
+table(lda_pred$class,Smarket_2005$Direction)
+mean(lda_pred$class==Smarket_2005$Direction)
+
+```
+
+
+---------------------------------------------------------------------
+
+3) K-Nearest Neighbours classification
+
+```{r}
+library(class)
+?knn
+
+Xlag <- cbind(Smarket$Lag1, Smarket$Lag2)
+train <- Smarket$Year < 2005
+
+knn_pred <- knn(Xlag[train,], Xlag[!train,], Smarket$Direction[train], k=1)
+
+table(knn_pred, Smarket$Direction[!train])
+mean(knn_pred == Smarket$Direction[!train])
+
+```
+
+
+
+## K-Nearest Neighbors
+library(class)
+?knn
+attach(Smarket)
+Xlag=cbind(Lag1,Lag2)
+train=Year<2005
+knn.pred=knn(Xlag[train,],Xlag[!train,],Direction[train],k=1)
+table(knn.pred,Direction[!train])
+mean(knn.pred==Direction[!train])
