@@ -1,6 +1,8 @@
+---
 theme: jekyll-theme-cayman
 
 title: ISLR Training
 description: |
-  Labs and exercise of ISLR course. /n /n
+  Labs and exercise of ISLR course.\n
   "All models are wrong, but some models are useful" - George Box
+---
