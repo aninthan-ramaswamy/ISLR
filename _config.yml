@@ -1,6 +1,6 @@
 theme: jekyll-theme-cayman
 
 title: ISLR Training
-description: | 
+description: > 
   Labs and exercise of ISLR course.
   All models are wrong, but some models are useful
