@@ -13,4 +13,5 @@ Following are the links to the individual notebooks -
 5. [Tree Based Models](https://aninthan-ramaswamy.github.io/ISLR-Training/Labs/Tree_Based_Models_ISLR.nb.html)
 6. [Unsupervised Learning](https://aninthan-ramaswamy.github.io/ISLR-Training/Labs/Unsupervised_Learning_ISLR.nb.html)
 
+The site also provided me with a [certificate](https://docs.google.com/viewer?url=https://github.com/aninthan-ramaswamy/ISLR-Training/raw/master/StatementOfAccomplishment.pdf) with distinction, which is sweet.
 Do reach out if there are any clarifications or suggestions!
